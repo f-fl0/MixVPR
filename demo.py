@@ -10,7 +10,7 @@ import torchvision.transforms as tvf
 from tqdm import tqdm
 import cv2
 
-from main import VPRModel
+from models.vpr import VPRModel
 
 
 class BaseDataset(data.Dataset):
