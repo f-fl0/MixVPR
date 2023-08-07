@@ -49,6 +49,7 @@ class InferencePipeline:
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.device = device
+        self.logs_dir = logs_dir
 
         self.dataloader = data.DataLoader(self.dataset,
                                           batch_size=self.batch_size,
@@ -59,9 +60,9 @@ class InferencePipeline:
 
     def run(self, split: str = 'db') -> np.ndarray:
 
-        if os.path.exists(f'./{logs_dir}/global_descriptors_{split}.npy'):
+        if os.path.exists(f'{self.logs_dir}/global_descriptors_{split}.npy'):
             print(f"Skipping {split} features extraction, loading from cache")
-            return np.load(f'./{logs_dir}/global_descriptors_{split}.npy')
+            return np.load(f'{self.logs_dir}/global_descriptors_{split}.npy')
 
         self.model.to(self.device)
         with torch.no_grad():
@@ -78,8 +79,8 @@ class InferencePipeline:
                 global_descriptors[np.array(indices), :] = descriptors
 
         # save global descriptors
-        os.makedirs(logs_dir, exist_ok=True)
-        np.save(f'./{logs_dir}/global_descriptors_{split}.npy', global_descriptors)
+        os.makedirs(self.logs_dir, exist_ok=True)
+        np.save(f'{self.logs_dir}/global_descriptors_{split}.npy', global_descriptors)
         return global_descriptors
 
 
@@ -148,7 +149,7 @@ def record_matches(top_k_matches: np.ndarray,
 def visualize(top_k_matches: np.ndarray,
               query_dataset: BaseDataset,
               database_dataset: BaseDataset,
-              logs_dir: str = './LOGS',
+              logs_dir: str,
               img_resize_size: Tuple = (320, 320)) -> None:
 
     visual_dir = f'{logs_dir}/visualize'
