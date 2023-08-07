@@ -42,7 +42,7 @@ class BaseDataset(data.Dataset):
 
 
 class InferencePipeline:
-    def __init__(self, model, dataset, feature_dim, batch_size=4, num_workers=4, device='cuda'):
+    def __init__(self, model, dataset, feature_dim, logs_dir, batch_size=4, num_workers=4, device='cuda'):
         self.model = model
         self.dataset = dataset
         self.feature_dim = feature_dim
@@ -59,9 +59,9 @@ class InferencePipeline:
 
     def run(self, split: str = 'db') -> np.ndarray:
 
-        if os.path.exists(f'./LOGS/global_descriptors_{split}.npy'):
+        if os.path.exists(f'./{logs_dir}/global_descriptors_{split}.npy'):
             print(f"Skipping {split} features extraction, loading from cache")
-            return np.load(f'./LOGS/global_descriptors_{split}.npy')
+            return np.load(f'./{logs_dir}/global_descriptors_{split}.npy')
 
         self.model.to(self.device)
         with torch.no_grad():
@@ -78,7 +78,8 @@ class InferencePipeline:
                 global_descriptors[np.array(indices), :] = descriptors
 
         # save global descriptors
-        np.save(f'./LOGS/global_descriptors_{split}.npy', global_descriptors)
+        os.makedirs(logs_dir, exist_ok=True)
+        np.save(f'./{logs_dir}/global_descriptors_{split}.npy', global_descriptors)
         return global_descriptors
 
 
@@ -147,10 +148,13 @@ def record_matches(top_k_matches: np.ndarray,
 def visualize(top_k_matches: np.ndarray,
               query_dataset: BaseDataset,
               database_dataset: BaseDataset,
-              visual_dir: str = './LOGS/visualize',
+              logs_dir: str = './LOGS',
               img_resize_size: Tuple = (320, 320)) -> None:
+
+    visual_dir = f'{logs_dir}/visualize'
     if not os.path.exists(visual_dir):
         os.makedirs(visual_dir)
+
     for q_idx, db_idx in enumerate(tqdm(top_k_matches, ncols=100, desc='Visualizing matches')):
         pred_q_path = query_dataset.img_path_list[q_idx]
         q_array = cv2.imread(pred_q_path, cv2.IMREAD_COLOR)
@@ -175,6 +179,7 @@ def main():
     # load images
     query_path = ''         # path to query images folder path
     datasets_path = ''      # path to database images folder path
+    logs_dir = './LOGS'
 
     assert query_path == '' and datasets_path == '', 'Please specify the path to the query and datasets'
 
@@ -182,11 +187,11 @@ def main():
     database_dataset = BaseDataset(datasets_path)
 
     # load model
-    model = load_model('./LOGS/resnet50_MixVPR_4096_channels(1024)_rows(4).ckpt')
+    model = load_model(f'{logs_dir}/resnet50_MixVPR_4096_channels(1024)_rows(4).ckpt')
 
     # set up inference pipeline
-    database_pipeline = InferencePipeline(model=model, dataset=database_dataset, feature_dim=4096)
-    query_pipeline = InferencePipeline(model=model, dataset=query_dataset, feature_dim=4096)
+    database_pipeline = InferencePipeline(model=model, dataset=database_dataset, feature_dim=4096, logs_dir=logs_dir)
+    query_pipeline = InferencePipeline(model=model, dataset=query_dataset, feature_dim=4096, logs_dir=logs_dir)
 
     # run inference
     db_global_descriptors = database_pipeline.run(split='db')  # shape: (num_db, feature_dim)
@@ -196,10 +201,10 @@ def main():
     top_k_matches = calculate_top_k(q_matrix=query_global_descriptors, db_matrix=db_global_descriptors, top_k=10)
 
     # record query_database_matches
-    record_matches(top_k_matches, query_dataset, database_dataset, out_file='./LOGS/record.txt')
+    record_matches(top_k_matches, query_dataset, database_dataset, out_file=f'{logs_dir}/record.txt')
 
     # visualize top-k matches
-    visualize(top_k_matches, query_dataset, database_dataset, visual_dir='./LOGS/visualize')
+    visualize(top_k_matches, query_dataset, database_dataset, logs_dir=logs_dir)
 
 
 if __name__ == '__main__':
