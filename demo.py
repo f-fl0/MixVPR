@@ -42,7 +42,7 @@ class BaseDataset(data.Dataset):
 
 
 class InferencePipeline:
-    def __init__(self, model, dataset, feature_dim, logs_dir, batch_size=4, num_workers=4, device='cuda'):
+    def __init__(self, model, dataset, feature_dim, logs_dir=None, batch_size=4, num_workers=4, device='cuda'):
         self.model = model
         self.dataset = dataset
         self.feature_dim = feature_dim
@@ -60,9 +60,10 @@ class InferencePipeline:
 
     def run(self, split: str = 'db') -> np.ndarray:
 
-        if os.path.exists(f'{self.logs_dir}/global_descriptors_{split}.npy'):
-            print(f"Skipping {split} features extraction, loading from cache")
-            return np.load(f'{self.logs_dir}/global_descriptors_{split}.npy')
+        if self.logs_dir is not None:
+            if os.path.exists(f'{self.logs_dir}/global_descriptors_{split}.npy'):
+                print(f"Skipping {split} features extraction, loading from cache")
+                return np.load(f'{self.logs_dir}/global_descriptors_{split}.npy')
 
         self.model.to(self.device)
         with torch.no_grad():
@@ -78,9 +79,10 @@ class InferencePipeline:
                 # add to global descriptors
                 global_descriptors[np.array(indices), :] = descriptors
 
-        # save global descriptors
-        os.makedirs(self.logs_dir, exist_ok=True)
-        np.save(f'{self.logs_dir}/global_descriptors_{split}.npy', global_descriptors)
+        if self.logs_dir is not None:
+            # save global descriptors
+            os.makedirs(self.logs_dir, exist_ok=True)
+            np.save(f'{self.logs_dir}/global_descriptors_{split}.npy', global_descriptors)
         return global_descriptors
 
 
